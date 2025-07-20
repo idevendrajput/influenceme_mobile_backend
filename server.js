@@ -68,7 +68,7 @@ app.use('/api/offers', offerRoutes);
 app.get('/api/health', (req, res) => {
     return successResponse(res, 'Server is running', {
         timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.0.1'
     });
 });
 
