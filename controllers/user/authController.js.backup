@@ -44,13 +44,6 @@ export const register = async (req, res) => {
         }
 
         // Create new user with parsed data
-// Remove null phone to avoid duplicate key error
-        if (!phone) {
-            delete parsedData.phone;
-        }
-        if (!email) {
-            delete parsedData.email;
-        }
         const user = await Influencer.create(parsedData);
 
         // Generate token

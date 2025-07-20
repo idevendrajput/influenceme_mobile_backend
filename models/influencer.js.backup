@@ -8,9 +8,8 @@ const influencerSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: false,
+    required: true,
     unique: true,
-    sparse: true,
     trim: true
   },
   email: {
