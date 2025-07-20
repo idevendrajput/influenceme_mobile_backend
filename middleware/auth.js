@@ -1,8 +1,18 @@
 // This file assumes the existing authenticate middleware is also here or will be merged.
 
 import jwt from 'jsonwebtoken';
-import User from '../models/influencer.js';
+import User from '../models/user.js';
+import Influencer from '../models/influencer.js';
 import { errorResponse } from '../utils/responseHelper.js';
+
+// Helper function to find user in appropriate collection
+const findUserByIdAndRole = async (userId, role) => {
+    if (role === 'influencer') {
+        return await Influencer.findById(userId);
+    } else {
+        return await User.findById(userId);
+    }
+};
 
 // Existing authenticate middleware (if you had it, ensure it's here)
 export const authenticate = async (req, res, next) => {
@@ -23,10 +33,27 @@ export const authenticate = async (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET); // Replace with your actual JWT_SECRET
-        req.user = await User.findById(decoded.id); // Attach user to request
-        if (!req.user) {
+        
+        // Try to find user in appropriate collection based on role
+        let user = null;
+        if (decoded.role) {
+            user = await findUserByIdAndRole(decoded.id, decoded.role);
+        } else {
+            // Fallback: try both collections if role is not in token
+            user = await User.findById(decoded.id) || await Influencer.findById(decoded.id);
+        }
+        
+        if (!user) {
             return errorResponse(res, 'User not found.', 404);
         }
+        
+        // Attach user with ID and role to request
+        req.user = {
+            id: user._id,
+            role: user.role,
+            ...user.toObject()
+        };
+        
         next();
     } catch (error) {
         console.error('Authentication error:', error);

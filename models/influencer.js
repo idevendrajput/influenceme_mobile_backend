@@ -8,7 +8,7 @@ const influencerSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
     trim: true
   },
@@ -24,6 +24,12 @@ const influencerSchema = new mongoose.Schema({
     type: String,
     required: false,
     trim: true
+  },
+  about: {
+    type: String,
+    required: false,
+    trim: true,
+    maxLength: 500
   },
   dateOfBirth: {
     type: Date,

@@ -1,5 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import http from 'http';
+import { Server } from 'socket.io';
 import cors from 'cors';
 import multer from 'multer';
 import connectDB from './config/db.js';
@@ -8,12 +10,21 @@ import userRoutes from './routes/user/userRoutes.js';
 import genreRoutes from './routes/genreRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import { successResponse, errorResponse } from './utils/responseHelper.js';
+import chatRoutes from './routes/chatRoutes.js';
+import offerRoutes from './routes/offerRoutes.js';
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
-connectDB();
+await connectDB();
 
 // CORS Configuration - Allow all origins for IP-based access
 app.use(
@@ -50,12 +61,36 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/genres', genreRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/chats', chatRoutes);
+app.use('/api/offers', offerRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     return successResponse(res, 'Server is running', {
         timestamp: new Date().toISOString(),
         version: '1.0.0'
+    });
+});
+
+// Socket.IO events
+io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+
+    // Join room
+    socket.on('joinRoom', ({ role, roomId }) => {
+        console.log(`${role} joined room: ${roomId}`);
+        socket.join(roomId);
+    });
+
+    // Handle chat message
+    socket.on('chatMessage', ({ roomId, message }) => {
+        console.log(`Message to ${roomId}: ${message}`);
+        io.to(roomId).emit('message', message);
+    });
+
+    // Disconnect
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
     });
 });
 
@@ -94,6 +129,8 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+
