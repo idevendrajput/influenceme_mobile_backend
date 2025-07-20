@@ -11,7 +11,8 @@ const influencerSchema = new mongoose.Schema({
     required: false,
     unique: true,
     sparse: true,
-    trim: true
+    trim: true,
+    default: null
   },
   email: {
     type: String,
@@ -19,12 +20,19 @@ const influencerSchema = new mongoose.Schema({
     unique: true,
     sparse: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    default: null
   },
   fullName: {
     type: String,
     required: false,
     trim: true
+  },
+  about: {
+    type: String,
+    required: false,
+    trim: true,
+    maxLength: 500
   },
   dateOfBirth: {
     type: Date,

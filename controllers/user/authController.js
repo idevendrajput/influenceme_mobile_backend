@@ -20,14 +20,40 @@ export const register = async (req, res) => {
     try {
         // Parse form data
         const parsedData = parseFormData(req.body, req.files);
-        const { name, email, country, phone, fullName, dateOfBirth, spokenLanguages } = parsedData;
+        const { 
+            name, 
+            email, 
+            country, 
+            phone, 
+            fullName, 
+            about,
+            dateOfBirth, 
+            spokenLanguages,
+            maritalStatus,
+            children,
+            pets,
+            addresses,
+            influencerType,
+            workType,
+            influencerSince
+        } = parsedData;
 
-        if(name == null) {
+        if(!name) {
             return errorResponse(res, 'Name is required', 400);
         }
 
         if (!email && !phone) {
             return errorResponse(res, 'Name and either email or phone is required', 400);
+        }
+        
+        // Validate about field length
+        if (about && about.length > 500) {
+            return errorResponse(res, 'About field cannot exceed 500 characters', 400);
+        }
+        
+        // Validate date of birth format
+        if (dateOfBirth && isNaN(new Date(dateOfBirth).getTime())) {
+            return errorResponse(res, 'Invalid date of birth format', 400);
         }
         
         // Check if user already exists
@@ -60,10 +86,24 @@ export const register = async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
+                fullName: user.fullName,
+                about: user.about,
                 email: user.email,
                 phone: user.phone,
                 country: user.country,
-                role: user.role
+                dateOfBirth: user.dateOfBirth,
+                spokenLanguages: user.spokenLanguages,
+                maritalStatus: user.maritalStatus,
+                children: user.children,
+                pets: user.pets,
+                addresses: user.addresses,
+                influencerType: user.influencerType,
+                workType: user.workType,
+                influencerSince: user.influencerSince,
+                role: user.role,
+                isActive: user.isActive,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
             },
             token
         }, 201);
@@ -129,10 +169,24 @@ export const login = async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
+                fullName: user.fullName,
+                about: user.about,
                 email: user.email,
                 phone: user.phone,
                 country: user.country,
-                role: user.role
+                dateOfBirth: user.dateOfBirth,
+                spokenLanguages: user.spokenLanguages,
+                maritalStatus: user.maritalStatus,
+                children: user.children,
+                pets: user.pets,
+                addresses: user.addresses,
+                influencerType: user.influencerType,
+                workType: user.workType,
+                influencerSince: user.influencerSince,
+                role: user.role,
+                isActive: user.isActive,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
             },
             token
         });
