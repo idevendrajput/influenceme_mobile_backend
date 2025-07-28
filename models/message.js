@@ -3,8 +3,7 @@ import mongoose from 'mongoose';
 const messageSchema = new mongoose.Schema({
   roomId: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   sender: {
     participantId: {

@@ -8,20 +8,18 @@ const influencerSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: false,
     unique: true,
     sparse: true,
     trim: true,
-    default: null
+    default: undefined
   },
   email: {
     type: String,
-    required: false,
     unique: true,
     sparse: true,
     trim: true,
     lowercase: true,
-    default: null
+    default: undefined
   },
   fullName: {
     type: String,
@@ -204,6 +202,14 @@ const influencerSchema = new mongoose.Schema({
     default: 'influencer'
   }
 }, {timestamps: true});
+
+influencerSchema.pre('validate', function (next) {
+  if (!this.phone && !this.email) {
+    this.invalidate('phone', 'Either phone or email is required.');
+    this.invalidate('email', 'Either phone or email is required.');
+  }
+  next();
+});
 
 // Transform output
 influencerSchema.methods.toJSON = function() {

@@ -5,6 +5,12 @@ import Influencer from '../models/influencer.js';
 import { successResponse, errorResponse } from '../utils/responseHelper.js';
 import { v4 as uuidv4 } from 'uuid';
 
+// Socket.IO instance will be passed from server.js
+let io = null;
+export const setSocketIO = (socketIO) => {
+  io = socketIO;
+};
+
 // Helper function to get user details based on type
 const getUserDetails = async (participantId, participantType) => {
   if (participantType === 'User') {

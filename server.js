@@ -12,6 +12,7 @@ import settingsRoutes from './routes/settingsRoutes.js';
 import { successResponse, errorResponse } from './utils/responseHelper.js';
 import chatRoutes from './routes/chatRoutes.js';
 import offerRoutes from './routes/offerRoutes.js';
+import { setSocketIO } from './controllers/chatController.js';
 
 dotenv.config();
 
@@ -68,29 +69,319 @@ app.use('/api/offers', offerRoutes);
 app.get('/api/health', (req, res) => {
     return successResponse(res, 'Server is running', {
         timestamp: new Date().toISOString(),
-        version: '1.0.1'
+        version: '1.0.2'
     });
+});
+
+// Store active users and their rooms
+const activeUsers = new Map();
+const userRooms = new Map();
+const typingUsers = new Map(); // roomId -> Set of userIds
+
+// Socket.IO middleware for authentication
+io.use((socket, next) => {
+    try {
+        const token = socket.handshake.auth.token;
+        if (!token) {
+            return next(new Error('Authentication required'));
+        }
+        
+        // For testing purposes, allow test tokens
+        if (token.startsWith('test-token-')) {
+            socket.userId = socket.handshake.auth.userId;
+            socket.userRole = socket.handshake.auth.userRole;
+            socket.userName = socket.handshake.auth.userName;
+            return next();
+        }
+        
+        // TODO: Add proper JWT token verification for production
+        socket.userId = socket.handshake.auth.userId;
+        socket.userRole = socket.handshake.auth.userRole;
+        socket.userName = socket.handshake.auth.userName;
+        
+        next();
+    } catch (error) {
+        console.error('Socket authentication error:', error);
+        next(new Error('Authentication failed'));
+    }
 });
 
 // Socket.IO events
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-
-    // Join room
-    socket.on('joinRoom', ({ role, roomId }) => {
-        console.log(`${role} joined room: ${roomId}`);
-        socket.join(roomId);
+    console.log('User connected:', socket.id, 'UserId:', socket.userId);
+    
+    // Store active user
+    activeUsers.set(socket.userId, {
+        socketId: socket.id,
+        userId: socket.userId,
+        role: socket.userRole,
+        name: socket.userName,
+        connectedAt: new Date()
     });
 
-    // Handle chat message
-    socket.on('chatMessage', ({ roomId, message }) => {
-        console.log(`Message to ${roomId}: ${message}`);
-        io.to(roomId).emit('message', message);
+    // Join room with enhanced validation
+    socket.on('joinRoom', async ({ roomId, userId }) => {
+        try {
+            if (!roomId || !userId) {
+                socket.emit('error', { message: 'Room ID and User ID are required' });
+                return;
+            }
+
+            console.log(`${socket.userRole} (${socket.userName}) joined room: ${roomId}`);
+            
+            socket.join(roomId);
+            
+            if (!userRooms.has(socket.userId)) {
+                userRooms.set(socket.userId, new Set());
+            }
+            userRooms.get(socket.userId).add(roomId);
+
+            socket.to(roomId).emit('userJoined', {
+                userId: socket.userId,
+                name: socket.userName,
+                role: socket.userRole,
+                timestamp: new Date()
+            });
+
+            socket.emit('roomJoined', {
+                roomId,
+                message: 'Successfully joined room',
+                timestamp: new Date()
+            });
+
+        } catch (error) {
+            console.error('Error joining room:', error);
+            socket.emit('error', { message: 'Failed to join room', error: error.message });
+        }
     });
 
-    // Disconnect
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
+    // Leave room
+    socket.on('leaveRoom', ({ roomId }) => {
+        try {
+            if (!roomId) {
+                socket.emit('error', { message: 'Room ID is required' });
+                return;
+            }
+
+            socket.leave(roomId);
+            
+            if (userRooms.has(socket.userId)) {
+                userRooms.get(socket.userId).delete(roomId);
+            }
+
+            if (typingUsers.has(roomId)) {
+                typingUsers.get(roomId).delete(socket.userId);
+                socket.to(roomId).emit('userStoppedTyping', {
+                    userId: socket.userId,
+                    name: socket.userName
+                });
+            }
+
+            socket.to(roomId).emit('userLeft', {
+                userId: socket.userId,
+                name: socket.userName,
+                role: socket.userRole,
+                timestamp: new Date()
+            });
+
+            console.log(`${socket.userName} left room: ${roomId}`);
+            
+            socket.emit('roomLeft', {
+                roomId,
+                message: 'Successfully left room',
+                timestamp: new Date()
+            });
+
+        } catch (error) {
+            console.error('Error leaving room:', error);
+            socket.emit('error', { message: 'Failed to leave room', error: error.message });
+        }
+    });
+
+    // Handle chat message with delivery status
+    socket.on('chatMessage', async ({ roomId, message, messageId, tempId }) => {
+        try {
+            if (!roomId || !message) {
+                socket.emit('error', { message: 'Room ID and message are required' });
+                return;
+            }
+
+            console.log(`Message from ${socket.userName} to ${roomId}:`, message);
+            
+            const enhancedMessage = {
+                messageId: messageId || Date.now().toString(),
+                tempId, 
+                content: message,
+                sender: {
+                    userId: socket.userId,
+                    name: socket.userName,
+                    role: socket.userRole
+                },
+                roomId,
+                timestamp: new Date(),
+                status: 'sent'
+            };
+
+            socket.to(roomId).emit('newMessage', enhancedMessage);
+            
+            socket.emit('messageDelivered', {
+                messageId: enhancedMessage.messageId,
+                tempId,
+                timestamp: new Date(),
+                status: 'delivered'
+            });
+
+            if (typingUsers.has(roomId)) {
+                typingUsers.get(roomId).delete(socket.userId);
+                socket.to(roomId).emit('userStoppedTyping', {
+                    userId: socket.userId,
+                    name: socket.userName
+                });
+            }
+
+        } catch (error) {
+            console.error('Error handling chat message:', error);
+            socket.emit('error', { message: 'Failed to send message', error: error.message });
+        }
+    });
+
+    // Typing indicators
+    socket.on('startTyping', ({ roomId }) => {
+        try {
+            if (!roomId) {
+                socket.emit('error', { message: 'Room ID is required' });
+                return;
+            }
+
+            if (!typingUsers.has(roomId)) {
+                typingUsers.set(roomId, new Set());
+            }
+            
+            typingUsers.get(roomId).add(socket.userId);
+            
+            socket.to(roomId).emit('userStartedTyping', {
+                userId: socket.userId,
+                name: socket.userName,
+                timestamp: new Date()
+            });
+
+        } catch (error) {
+            console.error('Error handling start typing:', error);
+        }
+    });
+
+    socket.on('stopTyping', ({ roomId }) => {
+        try {
+            if (!roomId) return;
+
+            if (typingUsers.has(roomId)) {
+                typingUsers.get(roomId).delete(socket.userId);
+            }
+            
+            socket.to(roomId).emit('userStoppedTyping', {
+                userId: socket.userId,
+                name: socket.userName,
+                timestamp: new Date()
+            });
+
+        } catch (error) {
+            console.error('Error handling stop typing:', error);
+        }
+    });
+
+    // Message read receipts
+    socket.on('markAsRead', ({ roomId, messageIds }) => {
+        try {
+            if (!roomId || !messageIds || !Array.isArray(messageIds)) {
+                socket.emit('error', { message: 'Room ID and message IDs are required' });
+                return;
+            }
+
+            socket.to(roomId).emit('messagesRead', {
+                readBy: {
+                    userId: socket.userId,
+                    name: socket.userName
+                },
+                messageIds,
+                timestamp: new Date()
+            });
+
+        } catch (error) {
+            console.error('Error handling mark as read:', error);
+        }
+    });
+
+    // Get online users in room
+    socket.on('getOnlineUsers', async ({ roomId }) => {
+        try {
+            if (!roomId) {
+                socket.emit('error', { message: 'Room ID is required' });
+                return;
+            }
+
+            const roomSockets = await io.in(roomId).fetchSockets();
+            const onlineUsers = roomSockets.map(s => ({
+                userId: s.userId,
+                name: s.userName,
+                role: s.userRole,
+                socketId: s.id
+            }));
+
+            socket.emit('onlineUsers', {
+                roomId,
+                users: onlineUsers,
+                count: onlineUsers.length
+            });
+
+        } catch (error) {
+            console.error('Error getting online users:', error);
+            socket.emit('error', { message: 'Failed to get online users', error: error.message });
+        }
+    });
+
+    // Handle connection errors
+    socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', (reason) => {
+        console.log('User disconnected:', socket.id, 'UserId:', socket.userId, 'Reason:', reason);
+        
+        try {
+            activeUsers.delete(socket.userId);
+            
+            for (const [roomId, typingSet] of typingUsers.entries()) {
+                if (typingSet.has(socket.userId)) {
+                    typingSet.delete(socket.userId);
+                    socket.to(roomId).emit('userStoppedTyping', {
+                        userId: socket.userId,
+                        name: socket.userName
+                    });
+                }
+            }
+            
+            if (userRooms.has(socket.userId)) {
+                for (const roomId of userRooms.get(socket.userId)) {
+                    socket.to(roomId).emit('userDisconnected', {
+                        userId: socket.userId,
+                        name: socket.userName,
+                        role: socket.userRole,
+                        timestamp: new Date(),
+                        reason
+                    });
+                }
+                userRooms.delete(socket.userId);
+            }
+            
+        } catch (error) {
+            console.error('Error during disconnect cleanup:', error);
+        }
+    });
+
+    // Ping-pong for connection health
+    socket.on('ping', () => {
+        socket.emit('pong', { timestamp: new Date() });
     });
 });
 
@@ -128,6 +419,9 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Pass Socket.IO instance to chat controller
+setSocketIO(io);
 
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

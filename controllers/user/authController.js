@@ -70,7 +70,7 @@ export const register = async (req, res) => {
         }
 
         // Create new user with parsed data
-// Remove null phone to avoid duplicate key error
+        // Remove null phone to avoid duplicate key error
         if (!phone) {
             delete parsedData.phone;
         }
@@ -88,7 +88,7 @@ export const register = async (req, res) => {
                 name: user.name,
                 fullName: user.fullName,
                 about: user.about,
-                email: user.email,
+                email: !user.email,
                 phone: user.phone,
                 country: user.country,
                 dateOfBirth: user.dateOfBirth,
