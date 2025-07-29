@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import dotenv from "dotenv"
+import dotenv from "dotenv";
 import User from "../../models/influencer.js";
 import Influencer from "../../models/influencer.js";
 import { successResponse, errorResponse } from '../../utils/responseHelper.js';
@@ -23,9 +23,9 @@ export const register = async (req, res) => {
         const { 
             name, 
             email, 
-            country, 
-            phone, 
-            fullName, 
+            country,
+            phoneCode,
+            phone,
             about,
             dateOfBirth, 
             spokenLanguages,
@@ -57,9 +57,8 @@ export const register = async (req, res) => {
         }
         
         // Check if user already exists
-        const existingUserByPhone = phone ? await User.findOne({ phone }) : null;
-        const existingUserByEmail = email ? await User.findOne({ email }) : null;
-
+        const existingUserByPhone = phone && phoneCode ? await User.findOne({ phone, phoneCode }).lean() : null;
+        const existingUserByEmail = email ? await User.findOne({ email }).lean() : null;
 
         if (existingUserByPhone) {
             return errorResponse(res, 'Phone number already exists', 400);
@@ -86,10 +85,10 @@ export const register = async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
-                fullName: user.fullName,
                 about: user.about,
-                email: !user.email,
+                email: user.email,
                 phone: user.phone,
+                phoneCode: user.phoneCode,
                 country: user.country,
                 dateOfBirth: user.dateOfBirth,
                 spokenLanguages: user.spokenLanguages,
@@ -117,14 +116,14 @@ export const checkUserExists = async (req, res) => {
     try {
         // Parse form data
         const parsedData = parseFormData(req.body);
-        const { email, phone } = parsedData;
+        const { email, phone, phoneCode } = parsedData;
         
         if (!email && !phone) {
             return errorResponse(res, 'Email or phone number is required', 400);
         }
         
-        const existingUserByPhone = phone ? await User.findOne({ phone }) : null;
-        const existingUserByEmail = email ? await User.findOne({ email }) : null;
+        const existingUserByPhone = phone && phoneCode ? await User.findOne({ phone, phoneCode }).lean() : null;
+        const existingUserByEmail = email ? await User.findOne({ email }).lean() : null;
         
         if (existingUserByPhone || existingUserByEmail) {
             return successResponse(res, 'User already exists', { exists: true });
@@ -140,7 +139,7 @@ export const login = async (req, res) => {
     try {
         // Parse form data
         const parsedData = parseFormData(req.body);
-        const { email, phone } = parsedData;
+        const { email, phone, phoneCode } = parsedData;
 
         if (!email && !phone) {
             return errorResponse(res, 'Email or phone number is required', 400);
@@ -149,9 +148,12 @@ export const login = async (req, res) => {
         // Find user by email or phone
         const query = {};
         if (email) query.email = email;
-        if (phone) query.phone = phone;
+        if (phone && phoneCode) {
+            query.phone = phone;
+            query.phoneCode = phoneCode;
+        }
         
-        const user = await User.findOne(query);
+        const user = await User.findOne(query).lean();
 
         if (!user) {
             return errorResponse(res, 'User not found', 404);
@@ -169,9 +171,9 @@ export const login = async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
-                fullName: user.fullName,
                 about: user.about,
                 email: user.email,
+                phoneCode: user.phoneCode,
                 phone: user.phone,
                 country: user.country,
                 dateOfBirth: user.dateOfBirth,

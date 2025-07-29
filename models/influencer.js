@@ -13,6 +13,7 @@ const influencerSchema = new mongoose.Schema({
     trim: true,
     default: undefined
   },
+  phoneCode: String,
   email: {
     type: String,
     unique: true,
@@ -20,11 +21,6 @@ const influencerSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
     default: undefined
-  },
-  fullName: {
-    type: String,
-    required: false,
-    trim: true
   },
   about: {
     type: String,
