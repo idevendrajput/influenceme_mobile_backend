@@ -75,7 +75,19 @@ const influencerSchema = new mongoose.Schema({
     enum: ['micro', 'macro', 'mega', 'nano'],
     required: false
   },
-  instagram: {
+  socialMedia: [{
+    platform: {
+      type: String,
+      required: true,
+      enum: ['instagram', 'facebook', 'linkedin', 'youtube', 'twitter', 'tiktok', 'snapchat', 'pinterest', 'other'],
+      lowercase: true,
+      trim: true
+    },
+    handle: {
+      type: String,
+      required: false,
+      trim: true
+    },
     url: {
       type: String,
       required: false,
@@ -104,73 +116,48 @@ const influencerSchema = new mongoose.Schema({
         min: 0,
         default: 0
       },
-      maximumLikesPerPost: {
+      maximumLikes: {
         type: Number,
         min: 0,
         default: 0
       }
-    }
-  },
-  facebook: {
-    url: {
-      type: String,
-      required: false,
-      trim: true
     },
-    followers: {
-      actual: {
+    // Platform-specific metrics
+    metrics: {
+      videosPosted: {
         type: Number,
         min: 0,
         default: 0
       },
-      bought: {
-        type: Number,
-        min: 0,
-        default: 0
-      }
-    }
-  },
-  linkedin: {
-    url: {
-      type: String,
-      required: false,
-      trim: true
-    },
-    followers: {
-      actual: {
+      postsCount: {
         type: Number,
         min: 0,
         default: 0
       },
-      bought: {
+      averageViews: {
+        type: Number,
+        min: 0,
+        default: 0
+      },
+      subscribers: {
         type: Number,
         min: 0,
         default: 0
       }
+    },
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    addedAt: {
+      type: Date,
+      default: Date.now
     }
-  },
-  youtube: {
-    url: {
-      type: String,
-      required: false,
-      trim: true
-    },
-    followers: {
-      type: Number,
-      min: 0,
-      default: 0
-    },
-    videosPosted: {
-      type: Number,
-      min: 0,
-      default: 0
-    },
-    maximumLikesPerVideo: {
-      type: Number,
-      min: 0,
-      default: 0
-    }
-  },
+  }],
   website: String,
   genre: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -206,6 +193,52 @@ influencerSchema.pre('validate', function (next) {
   }
   next();
 });
+
+// Helper method to add or update social media platform
+influencerSchema.methods.addSocialMedia = function(platformData) {
+  const existingIndex = this.socialMedia.findIndex(
+    sm => sm.platform === platformData.platform.toLowerCase()
+  );
+  
+  if (existingIndex > -1) {
+    // Update existing platform
+    this.socialMedia[existingIndex] = {
+      ...this.socialMedia[existingIndex].toObject(),
+      ...platformData,
+      platform: platformData.platform.toLowerCase()
+    };
+  } else {
+    // Add new platform
+    this.socialMedia.push({
+      ...platformData,
+      platform: platformData.platform.toLowerCase()
+    });
+  }
+};
+
+// Helper method to get social media by platform
+influencerSchema.methods.getSocialMediaByPlatform = function(platform) {
+  return this.socialMedia.find(sm => sm.platform === platform.toLowerCase());
+};
+
+// Helper method to remove social media platform
+influencerSchema.methods.removeSocialMedia = function(platform) {
+  this.socialMedia = this.socialMedia.filter(
+    sm => sm.platform !== platform.toLowerCase()
+  );
+};
+
+// Helper method to get total followers across all platforms
+influencerSchema.methods.getTotalFollowers = function() {
+  return this.socialMedia.reduce((total, sm) => {
+    return total + (sm.followers?.actual || 0);
+  }, 0);
+};
+
+// Helper method to get active social media platforms
+influencerSchema.methods.getActivePlatforms = function() {
+  return this.socialMedia.filter(sm => sm.isActive);
+};
 
 // Transform output
 influencerSchema.methods.toJSON = function() {

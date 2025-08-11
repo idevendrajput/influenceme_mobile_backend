@@ -33,11 +33,8 @@ export const getProfile = async (req, res) => {
                 pets: user.pets,
                 media: user.media,
                 influencerType: user.influencerType,
-                instagram: user.instagram,
-                facebook: user.facebook,
-                linkedin: user.linkedin,
+                socialMedia: user.socialMedia,
                 website: user.website,
-                youtube: user.youtube,
                 genre: user.genre,
                 workType: user.workType,
                 influencerSince: user.influencerSince,
@@ -110,81 +107,14 @@ export const updateProfile = async (req, res) => {
 
             user.influencerType = parsedData.influencerType || user.influencerType;
             
-            // Handle nested social media updates
-            if (parsedData.instagram) {
-                user.instagram = user.instagram || {};
-                if (parsedData.instagram.url !== undefined) {
-                    user.instagram.url = parsedData.instagram.url;
-                }
-                if (parsedData.instagram.followers) {
-                    user.instagram.followers = user.instagram.followers || {};
-                    if (parsedData.instagram.followers.actual !== undefined) {
-                        user.instagram.followers.actual = parsedData.instagram.followers.actual;
+            // Handle dynamic socialMedia array updates
+            if (parsedData.socialMedia && Array.isArray(parsedData.socialMedia)) {
+                // Process each social media platform in the array
+                parsedData.socialMedia.forEach(platformData => {
+                    if (platformData.platform) {
+                        user.addSocialMedia(platformData);
                     }
-                    if (parsedData.instagram.followers.bought !== undefined) {
-                        user.instagram.followers.bought = parsedData.instagram.followers.bought;
-                    }
-                }
-                if (parsedData.instagram.engagement) {
-                    user.instagram.engagement = user.instagram.engagement || {};
-                    if (parsedData.instagram.engagement.averagePerPost !== undefined) {
-                        user.instagram.engagement.averagePerPost = parsedData.instagram.engagement.averagePerPost;
-                    }
-                    if (parsedData.instagram.engagement.topEngagementPerPost !== undefined) {
-                        user.instagram.engagement.topEngagementPerPost = parsedData.instagram.engagement.topEngagementPerPost;
-                    }
-                    if (parsedData.instagram.engagement.maximumLikesPerPost !== undefined) {
-                        user.instagram.engagement.maximumLikesPerPost = parsedData.instagram.engagement.maximumLikesPerPost;
-                    }
-                }
-            }
-            
-            if (parsedData.facebook) {
-                user.facebook = user.facebook || {};
-                if (parsedData.facebook.url !== undefined) {
-                    user.facebook.url = parsedData.facebook.url;
-                }
-                if (parsedData.facebook.followers) {
-                    user.facebook.followers = user.facebook.followers || {};
-                    if (parsedData.facebook.followers.actual !== undefined) {
-                        user.facebook.followers.actual = parsedData.facebook.followers.actual;
-                    }
-                    if (parsedData.facebook.followers.bought !== undefined) {
-                        user.facebook.followers.bought = parsedData.facebook.followers.bought;
-                    }
-                }
-            }
-            
-            if (parsedData.linkedin) {
-                user.linkedin = user.linkedin || {};
-                if (parsedData.linkedin.url !== undefined) {
-                    user.linkedin.url = parsedData.linkedin.url;
-                }
-                if (parsedData.linkedin.followers) {
-                    user.linkedin.followers = user.linkedin.followers || {};
-                    if (parsedData.linkedin.followers.actual !== undefined) {
-                        user.linkedin.followers.actual = parsedData.linkedin.followers.actual;
-                    }
-                    if (parsedData.linkedin.followers.bought !== undefined) {
-                        user.linkedin.followers.bought = parsedData.linkedin.followers.bought;
-                    }
-                }
-            }
-            
-            if (parsedData.youtube) {
-                user.youtube = user.youtube || {};
-                if (parsedData.youtube.url !== undefined) {
-                    user.youtube.url = parsedData.youtube.url;
-                }
-                if (parsedData.youtube.followers !== undefined) {
-                    user.youtube.followers = parsedData.youtube.followers;
-                }
-                if (parsedData.youtube.videosPosted !== undefined) {
-                    user.youtube.videosPosted = parsedData.youtube.videosPosted;
-                }
-                if (parsedData.youtube.maximumLikesPerVideo !== undefined) {
-                    user.youtube.maximumLikesPerVideo = parsedData.youtube.maximumLikesPerVideo;
-                }
+                });
             }
             
             user.website = parsedData.website || user.website;
@@ -249,12 +179,24 @@ export const getAllUsers = async (req, res) => {
         }
         
         if (req.query.minFollowers) {
-            filter.$or = [
-                { "instagram.followers.actual": { $gte: parseInt(req.query.minFollowers) } },
-                { "facebook.followers.actual": { $gte: parseInt(req.query.minFollowers) } },
-                { "linkedin.followers.actual": { $gte: parseInt(req.query.minFollowers) } },
-                { "youtube.followers": { $gte: parseInt(req.query.minFollowers) } }
-            ];
+            filter.socialMedia = {
+                $elemMatch: {
+                    "followers.actual": { $gte: parseInt(req.query.minFollowers) }
+                }
+            };
+        }
+        
+        // Filter by specific social media platform
+        if (req.query.platform) {
+            const platformFilter = { "socialMedia.platform": req.query.platform.toLowerCase() };
+            if (req.query.minFollowers) {
+                filter.$and = [
+                    { socialMedia: { $elemMatch: { platform: req.query.platform.toLowerCase() } } },
+                    { socialMedia: { $elemMatch: { "followers.actual": { $gte: parseInt(req.query.minFollowers) } } } }
+                ];
+            } else {
+                Object.assign(filter, platformFilter);
+            }
         }
         
         if (req.query.name) {

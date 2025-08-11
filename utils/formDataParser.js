@@ -84,80 +84,82 @@ export const parseFormData = (body, files = {}) => {
         parsed.influencerSince = parseNumberField(parsed.influencerSince);
     }
     
-    // Parse social media objects
-    if (parsed.instagram) {
-        if (typeof parsed.instagram === 'string') {
-            parsed.instagram = parseJSONField(parsed.instagram);
+    // Parse dynamic socialMedia array
+    if (parsed.socialMedia) {
+        if (typeof parsed.socialMedia === 'string') {
+            parsed.socialMedia = parseJSONField(parsed.socialMedia);
         }
-        if (parsed.instagram && typeof parsed.instagram === 'object') {
-            if (parsed.instagram.followers) {
-                if (parsed.instagram.followers.actual !== undefined) {
-                    parsed.instagram.followers.actual = parseNumberField(parsed.instagram.followers.actual);
+        
+        if (Array.isArray(parsed.socialMedia)) {
+            parsed.socialMedia = parsed.socialMedia.map(platform => {
+                if (typeof platform === 'string') {
+                    platform = parseJSONField(platform);
                 }
-                if (parsed.instagram.followers.bought !== undefined) {
-                    parsed.instagram.followers.bought = parseNumberField(parsed.instagram.followers.bought);
+                
+                if (platform && typeof platform === 'object') {
+                    // Parse number fields in followers
+                    if (platform.followers) {
+                        if (platform.followers.actual !== undefined) {
+                            platform.followers.actual = parseNumberField(platform.followers.actual);
+                        }
+                        if (platform.followers.bought !== undefined) {
+                            platform.followers.bought = parseNumberField(platform.followers.bought);
+                        }
+                    }
+                    
+                    // Parse number fields in engagement
+                    if (platform.engagement) {
+                        if (platform.engagement.averagePerPost !== undefined) {
+                            platform.engagement.averagePerPost = parseNumberField(platform.engagement.averagePerPost);
+                        }
+                        if (platform.engagement.topEngagementPerPost !== undefined) {
+                            platform.engagement.topEngagementPerPost = parseNumberField(platform.engagement.topEngagementPerPost);
+                        }
+                        if (platform.engagement.maximumLikes !== undefined) {
+                            platform.engagement.maximumLikes = parseNumberField(platform.engagement.maximumLikes);
+                        }
+                    }
+                    
+                    // Parse number fields in metrics
+                    if (platform.metrics) {
+                        if (platform.metrics.videosPosted !== undefined) {
+                            platform.metrics.videosPosted = parseNumberField(platform.metrics.videosPosted);
+                        }
+                        if (platform.metrics.postsCount !== undefined) {
+                            platform.metrics.postsCount = parseNumberField(platform.metrics.postsCount);
+                        }
+                        if (platform.metrics.averageViews !== undefined) {
+                            platform.metrics.averageViews = parseNumberField(platform.metrics.averageViews);
+                        }
+                        if (platform.metrics.subscribers !== undefined) {
+                            platform.metrics.subscribers = parseNumberField(platform.metrics.subscribers);
+                        }
+                    }
+                    
+                    // Parse boolean fields
+                    if (platform.isVerified !== undefined) {
+                        platform.isVerified = parseBooleanField(platform.isVerified);
+                    }
+                    if (platform.isActive !== undefined) {
+                        platform.isActive = parseBooleanField(platform.isActive);
+                    }
+                    
+                    // Parse date field
+                    if (platform.addedAt) {
+                        platform.addedAt = parseDateField(platform.addedAt);
+                    }
+                    
+                    // Ensure platform name is lowercase
+                    if (platform.platform) {
+                        platform.platform = platform.platform.toLowerCase();
+                    }
                 }
-            }
-            if (parsed.instagram.engagement) {
-                if (parsed.instagram.engagement.averagePerPost !== undefined) {
-                    parsed.instagram.engagement.averagePerPost = parseNumberField(parsed.instagram.engagement.averagePerPost);
-                }
-                if (parsed.instagram.engagement.topEngagementPerPost !== undefined) {
-                    parsed.instagram.engagement.topEngagementPerPost = parseNumberField(parsed.instagram.engagement.topEngagementPerPost);
-                }
-                if (parsed.instagram.engagement.maximumLikesPerPost !== undefined) {
-                    parsed.instagram.engagement.maximumLikesPerPost = parseNumberField(parsed.instagram.engagement.maximumLikesPerPost);
-                }
-            }
-        }
-    }
-    
-    if (parsed.facebook) {
-        if (typeof parsed.facebook === 'string') {
-            parsed.facebook = parseJSONField(parsed.facebook);
-        }
-        if (parsed.facebook && typeof parsed.facebook === 'object') {
-            if (parsed.facebook.followers) {
-                if (parsed.facebook.followers.actual !== undefined) {
-                    parsed.facebook.followers.actual = parseNumberField(parsed.facebook.followers.actual);
-                }
-                if (parsed.facebook.followers.bought !== undefined) {
-                    parsed.facebook.followers.bought = parseNumberField(parsed.facebook.followers.bought);
-                }
-            }
-        }
-    }
-    
-    if (parsed.linkedin) {
-        if (typeof parsed.linkedin === 'string') {
-            parsed.linkedin = parseJSONField(parsed.linkedin);
-        }
-        if (parsed.linkedin && typeof parsed.linkedin === 'object') {
-            if (parsed.linkedin.followers) {
-                if (parsed.linkedin.followers.actual !== undefined) {
-                    parsed.linkedin.followers.actual = parseNumberField(parsed.linkedin.followers.actual);
-                }
-                if (parsed.linkedin.followers.bought !== undefined) {
-                    parsed.linkedin.followers.bought = parseNumberField(parsed.linkedin.followers.bought);
-                }
-            }
-        }
-    }
-    
-    if (parsed.youtube) {
-        if (typeof parsed.youtube === 'string') {
-            parsed.youtube = parseJSONField(parsed.youtube);
-        }
-        if (parsed.youtube && typeof parsed.youtube === 'object') {
-            if (parsed.youtube.followers !== undefined) {
-                parsed.youtube.followers = parseNumberField(parsed.youtube.followers);
-            }
-            if (parsed.youtube.videosPosted !== undefined) {
-                parsed.youtube.videosPosted = parseNumberField(parsed.youtube.videosPosted);
-            }
-            if (parsed.youtube.maximumLikesPerVideo !== undefined) {
-                parsed.youtube.maximumLikesPerVideo = parseNumberField(parsed.youtube.maximumLikesPerVideo);
-            }
+                
+                return platform;
+            }).filter(platform => platform && platform.platform); // Filter out invalid entries
+        } else if (parsed.socialMedia && typeof parsed.socialMedia === 'object') {
+            // If it's a single object instead of array, convert to array
+            parsed.socialMedia = [parsed.socialMedia];
         }
     }
 
