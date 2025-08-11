@@ -4,15 +4,11 @@ import User from "../../models/influencer.js";
 import Influencer from "../../models/influencer.js";
 import { successResponse, errorResponse } from '../../utils/responseHelper.js';
 import { parseFormData } from '../../utils/formDataParser.js';
+import { generateMobileToken } from '../../utils/jwtService.js';
 
 dotenv.config();
 
-// Generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '30d',
-  });
-};
+// Old generateToken function removed - now using unified JWT service
 
 // Registration Handler
 // @influence registration
@@ -78,8 +74,8 @@ export const register = async (req, res) => {
         }
         const user = await Influencer.create(parsedData);
 
-        // Generate token
-        const token = generateToken(user._id);
+        // Generate token using unified JWT service
+        const token = generateMobileToken(user._id, user.role || 'influencer');
 
         return successResponse(res, 'User registered successfully', {
             user: {
@@ -164,8 +160,8 @@ export const login = async (req, res) => {
             return errorResponse(res, 'Account is deactivated', 403);
         }
 
-        // Generate token
-        const token = generateToken(user._id);
+        // Generate token using unified JWT service
+        const token = generateMobileToken(user._id, user.role || 'influencer');
 
         return successResponse(res, 'Login successful', {
             user: {

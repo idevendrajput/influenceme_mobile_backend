@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
 import Influencer from '../models/influencer.js';
 import { errorResponse } from '../utils/responseHelper.js';
+import { verifyToken, validateCrossBackendAccess } from '../utils/jwtService.js';
 
 // Helper function to find user in appropriate collection
 const findUserByIdAndRole = async (userId, role) => {
@@ -14,7 +15,7 @@ const findUserByIdAndRole = async (userId, role) => {
     }
 };
 
-// Existing authenticate middleware (if you had it, ensure it's here)
+// Cross-backend compatible authentication middleware
 export const authenticate = async (req, res, next) => {
     try {
         let token;
@@ -23,16 +24,24 @@ export const authenticate = async (req, res, next) => {
         if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
             token = req.headers.authorization.split(' ')[1];
         }
-        // If you're using cookies for token storage, you might check req.cookies.token here too
-        // else if (req.cookies.token) {
-        //     token = req.cookies.token;
-        // }
 
         if (!token) {
             return errorResponse(res, 'Not authorized, no token provided.', 401);
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Replace with your actual JWT_SECRET
+        // Use unified JWT service for token verification
+        let decoded;
+        try {
+            decoded = verifyToken(token);
+        } catch (jwtError) {
+            // Fallback to old JWT verification for backward compatibility
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        }
+        
+        // Validate cross-backend access
+        if (!validateCrossBackendAccess(decoded, 'mobile')) {
+            return errorResponse(res, 'Token not valid for this backend.', 403);
+        }
         
         // Try to find user in appropriate collection based on role
         let user = null;
@@ -51,6 +60,8 @@ export const authenticate = async (req, res, next) => {
         req.user = {
             id: user._id,
             role: user.role,
+            source: decoded.source || 'mobile',
+            platform: decoded.platform || 'influence-me',
             ...user.toObject()
         };
         
