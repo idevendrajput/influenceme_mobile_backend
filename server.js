@@ -4,6 +4,11 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import multer from 'multer';
+import helmet from 'helmet';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import { body, validationResult } from 'express-validator';
+import cron from 'node-cron';
 import connectDB from './config/db.js';
 import authRoutes from "./routes/user/authRoutes.js"
 import userRoutes from './routes/user/userRoutes.js';
@@ -18,14 +23,47 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+// 🚀 Enhanced Socket.IO Configuration
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST", "PUT", "DELETE"]
+  },
+  // Advanced configurations
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  allowEIO3: true,
+  transports: ['websocket', 'polling'],
+  // Connection state recovery
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+    skipMiddlewares: true,
+  },
+  // Adapter configuration for clustering (if needed)
+  adapter: undefined // Can be configured for Redis adapter in production
 });
 
 await connectDB();
+
+// 🔒 Security Middleware
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: false
+}));
+app.use(compression());
+
+// 🚯 Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // limit each IP to 1000 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/', limiter);
 
 // CORS Configuration - Allow all origins for IP-based access
 app.use(
@@ -73,10 +111,47 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Store active users and their rooms
+// 📊 Store active users and their rooms with enhanced tracking
 const activeUsers = new Map();
 const userRooms = new Map();
 const typingUsers = new Map(); // roomId -> Set of userIds
+const userPresence = new Map(); // userId -> { status, lastSeen, currentRoom }
+const roomParticipants = new Map(); // roomId -> Set of userIds
+const messageQueue = new Map(); // userId -> Array of pending messages
+
+// 🔄 Cleanup inactive users every 5 minutes
+cron.schedule('*/5 * * * *', () => {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  
+  for (const [userId, presence] of userPresence.entries()) {
+    if (presence.lastSeen < fiveMinutesAgo && presence.status !== 'offline') {
+      userPresence.set(userId, {
+        ...presence,
+        status: 'offline',
+        lastSeen: new Date()
+      });
+      console.log(`User ${userId} marked as offline due to inactivity`);
+    }
+  }
+});
+
+// 🔔 Notification system
+const sendNotification = (userId, notification) => {
+  const user = activeUsers.get(userId);
+  if (user && user.socketId) {
+    io.to(user.socketId).emit('notification', notification);
+  } else {
+    // Queue notification for offline user
+    if (!messageQueue.has(userId)) {
+      messageQueue.set(userId, []);
+    }
+    messageQueue.get(userId).push({
+      type: 'notification',
+      data: notification,
+      timestamp: new Date()
+    });
+  }
+};
 
 // Socket.IO middleware for authentication
 io.use((socket, next) => {

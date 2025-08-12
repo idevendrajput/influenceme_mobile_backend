@@ -75,7 +75,10 @@ export const register = async (req, res) => {
         const user = await Influencer.create(parsedData);
 
         // Generate token using unified JWT service
-        const token = generateMobileToken(user._id, user.role || 'influencer');
+        const token = generateMobileToken(user._id, user.role || 'influencer', {
+            email: user.email,
+            name: user.name
+        });
 
         return successResponse(res, 'User registered successfully', {
             user: {
@@ -161,7 +164,10 @@ export const login = async (req, res) => {
         }
 
         // Generate token using unified JWT service
-        const token = generateMobileToken(user._id, user.role || 'influencer');
+        const token = generateMobileToken(user._id, user.role || 'influencer', {
+            email: user.email,
+            name: user.name
+        });
 
         return successResponse(res, 'Login successful', {
             user: {
