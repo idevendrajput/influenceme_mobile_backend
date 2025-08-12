@@ -27,9 +27,9 @@ const __dirname = path.dirname(__filename);
 
 // Configuration
 const config = {
-  SERVER_URL: 'http://82.29.162.56:3001',
-  API_BASE: 'http://82.29.162.56:3001/api',
-  SOCKET_URL: 'http://82.29.162.56:3001',
+  SERVER_URL: 'https://mobile.influence-me.in',
+  API_BASE: 'https://mobile.influence-me.in/api',
+  SOCKET_URL: 'https://mobile.influence-me.in',
   TEST_TIMEOUT: 30000,
   
   // Test users
