@@ -62,3 +62,4 @@ export const handleMultipleFiles = upload.array('files', 10);
 export const handleTextFormData = multer().none();
 
 export default upload;
+export { upload };
