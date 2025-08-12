@@ -86,30 +86,34 @@ export const isTokenExpired = (token) => {
 
 /**
  * Generate token for mobile backend users (influencers)
- * @param {Object} user - User object from influencer model
+ * @param {string} userId - User ID
+ * @param {string} role - User role (influencer, etc.)
+ * @param {Object} [additionalData] - Additional user data (optional)
  * @returns {string} JWT token
  */
-export const generateMobileToken = (user) => {
+export const generateMobileToken = (userId, role, additionalData = {}) => {
     return generateToken({
-        id: user._id,
-        role: user.role || 'influencer',
-        email: user.email,
-        name: user.name,
+        id: userId,
+        role: role || 'influencer',
+        email: additionalData.email,
+        name: additionalData.name,
         source: 'mobile'
     });
 };
 
 /**
  * Generate token for website backend users (brands, vendors, admins)
- * @param {Object} user - User object from website user model
+ * @param {string} userId - User ID
+ * @param {string} role - User role
+ * @param {Object} [additionalData] - Additional user data (optional)
  * @returns {string} JWT token
  */
-export const generateWebsiteToken = (user) => {
+export const generateWebsiteToken = (userId, role, additionalData = {}) => {
     return generateToken({
-        id: user._id,
-        role: user.role,
-        email: user.email,
-        name: user.fullName || user.name,
+        id: userId,
+        role: role,
+        email: additionalData.email,
+        name: additionalData.fullName || additionalData.name,
         source: 'website'
     });
 };
