@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
 import Influencer from '../models/influencer.js';
 import { errorResponse } from '../utils/responseHelper.js';
-import { verifyToken, validateCrossBackendAccess } from '../utils/jwtService.js';
+import { verifyToken as jwtVerifyToken, validateCrossBackendAccess } from '../utils/jwtService.js';
 
 // Helper function to find user in appropriate collection
 const findUserByIdAndRole = async (userId, role) => {
@@ -32,7 +32,7 @@ export const authenticate = async (req, res, next) => {
         // Use unified JWT service for token verification
         let decoded;
         try {
-            decoded = verifyToken(token);
+            decoded = jwtVerifyToken(token);
         } catch (jwtError) {
             // Fallback to old JWT verification for backward compatibility
             decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -87,3 +87,6 @@ export const authorize = (...roles) => {
         next();
     };
 };
+
+// Alias for backward compatibility
+export { authenticate as verifyToken };

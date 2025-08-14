@@ -17,6 +17,7 @@ import settingsRoutes from './routes/settingsRoutes.js';
 import { successResponse, errorResponse } from './utils/responseHelper.js';
 import chatRoutes from './routes/chatRoutes.js';
 import offerRoutes from './routes/offerRoutes.js';
+import campaignRoutes from './routes/campaignRoutes.js';
 import { setSocketIO } from './controllers/chatController.js';
 
 dotenv.config();
@@ -102,6 +103,7 @@ app.use('/api/genres', genreRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/offers', offerRoutes);
+app.use('/api/campaigns', campaignRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
