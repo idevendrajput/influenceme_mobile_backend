@@ -178,10 +178,136 @@ export const getAllUsers = async (req, res) => {
             filter.maritalStatus = req.query.maritalStatus;
         }
         
-        if (req.query.minFollowers) {
+        // Age bracket filtering
+        if (req.query.ageBracket) {
+            const today = new Date();
+            let minAge, maxAge;
+            
+            switch (req.query.ageBracket) {
+                case '18-24':
+                    minAge = 18; maxAge = 24;
+                    break;
+                case '25-34':
+                    minAge = 25; maxAge = 34;
+                    break;
+                case '35-44':
+                    minAge = 35; maxAge = 44;
+                    break;
+                case '45-54':
+                    minAge = 45; maxAge = 54;
+                    break;
+                case '55+':
+                    minAge = 55; maxAge = 100;
+                    break;
+            }
+            
+            if (minAge && maxAge) {
+                const maxDate = new Date(today.getFullYear() - minAge, today.getMonth(), today.getDate());
+                const minDate = new Date(today.getFullYear() - maxAge - 1, today.getMonth(), today.getDate());
+                filter.dateOfBirth = { $lte: maxDate, $gte: minDate };
+            }
+        }
+        
+        // Language filtering
+        if (req.query.languages) {
+            const languages = req.query.languages.split(',');
+            filter.spokenLanguages = { $in: languages };
+        }
+        
+        // Children filtering
+        if (req.query.hasChildren === 'true') {
+            filter.children = { $gt: 0 };
+        } else if (req.query.hasChildren === 'false') {
+            filter.children = { $eq: 0 };
+        }
+        
+        // Pets filtering
+        if (req.query.hasPets === 'true') {
+            filter.pets = { $gt: 0 };
+        } else if (req.query.hasPets === 'false') {
+            filter.pets = { $eq: 0 };
+        }
+        
+        // Location in city (address filtering)
+        if (req.query.city) {
+            filter['addresses.state'] = { $regex: req.query.city, $options: 'i' };
+        }
+        
+        if (req.query.locationInCity) {
+            filter['addresses.streetAddress'] = { $regex: req.query.locationInCity, $options: 'i' };
+        }
+        
+        // Engagement rate filtering
+        if (req.query.minEngagement) {
+            const minEngagement = parseFloat(req.query.minEngagement);
+            filter.socialMedia = {
+                ...filter.socialMedia,
+                $elemMatch: {
+                    ...filter.socialMedia?.$elemMatch,
+                    $expr: {
+                        $gte: [
+                            {
+                                $cond: [
+                                    { $gt: ["$socialMedia.followers.actual", 0] },
+                                    { $divide: ["$socialMedia.engagement.averagePerPost", "$socialMedia.followers.actual"] },
+                                    0
+                                ]
+                            },
+                            minEngagement / 100
+                        ]
+                    }
+                }
+            };
+        }
+        
+        if (req.query.maxEngagement) {
+            const maxEngagement = parseFloat(req.query.maxEngagement);
+            const existingFilter = filter.socialMedia?.$elemMatch || {};
             filter.socialMedia = {
                 $elemMatch: {
-                    "followers.actual": { $gte: parseInt(req.query.minFollowers) }
+                    ...existingFilter,
+                    $expr: {
+                        $and: [
+                            existingFilter.$expr || { $literal: true },
+                            {
+                                $lte: [
+                                    {
+                                        $cond: [
+                                            { $gt: ["$socialMedia.followers.actual", 0] },
+                                            { $divide: ["$socialMedia.engagement.averagePerPost", "$socialMedia.followers.actual"] },
+                                            0
+                                        ]
+                                    },
+                                    maxEngagement / 100
+                                ]
+                            }
+                        ]
+                    }
+                }
+            };
+        }
+        
+        if (req.query.minFollowers) {
+            const minFollowers = parseInt(req.query.minFollowers);
+            const existingFilter = filter.socialMedia?.$elemMatch || {};
+            filter.socialMedia = {
+                $elemMatch: {
+                    ...existingFilter,
+                    "followers.actual": { $gte: minFollowers }
+                }
+            };
+        }
+        
+        if (req.query.maxFollowers) {
+            const maxFollowers = parseInt(req.query.maxFollowers);
+            const existingFilter = filter.socialMedia?.$elemMatch || {};
+            filter.socialMedia = {
+                $elemMatch: {
+                    ...existingFilter,
+                    "followers.actual": { 
+                        ...existingFilter["followers.actual"],
+                        $lte: maxFollowers 
+                    }
                 }
             };
         }
