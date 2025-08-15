@@ -104,7 +104,7 @@ export const getUserChatRooms = async (req, res) => {
     // Format response with participant details
     const formattedChats = await Promise.all(chatRooms.map(async (chat) => {
       const otherParticipants = chat.participants.filter(p => 
-        p.participantId._id.toString() !== userId.toString()
+        p.participantId && p.participantId._id && p.participantId._id.toString() !== userId.toString()
       );
 
       return {
@@ -112,11 +112,11 @@ export const getUserChatRooms = async (req, res) => {
         roomId: chat.roomId,
         chatType: chat.chatType,
         status: chat.status,
-        participants: otherParticipants.map(p => ({
+        participants: otherParticipants.filter(p => p.participantId).map(p => ({
           id: p.participantId._id,
-          name: p.participantId.fullName || p.participantId.name,
-          email: p.participantId.email,
-          role: p.role
+          name: p.participantId.fullName || p.participantId.name || 'Unknown',
+          email: p.participantId.email || '',
+          role: p.role || 'user'
         })),
         lastMessage: chat.lastMessage,
         createdAt: chat.createdAt,
@@ -232,124 +232,6 @@ export const sendMessage = async (req, res) => {
   }
 };
 
-// Mark messages as read
-export const markMessagesAsRead = async (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const { messageIds } = req.body;
-    const userId = req.user.id;
-
-    // Verify user is participant in this chat
-    const chat = await Chat.findOne({
-      roomId: roomId,
-      'participants.participantId': userId
-    });
-
-    if (!chat) {
-      return errorResponse(res, 'Chat room not found or access denied', 404);
-    }
-
-    // Update messages
-    const updateResult = await Message.updateMany(
-      {
-        _id: { $in: messageIds },
-        roomId: roomId,
-        'readBy.participantId': { $ne: userId }
-      },
-      {
-        $push: {
-          readBy: {
-            participantId: userId,
-            readAt: new Date()
-          }
-        },
-        $set: { status: 'read' }
-      }
-    );
-
-    return successResponse(res, 'Messages marked as read', {
-      modifiedCount: updateResult.modifiedCount
-    });
-
-  } catch (error) {
-    console.error('Error marking messages as read:', error);
-    return errorResponse(res, 'Failed to mark messages as read', 500);
-  }
-};
-
-// Get unread message count
-export const getUnreadMessageCount = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    // Get all chat rooms user is part of
-    const userChats = await Chat.find({
-      'participants.participantId': userId,
-      status: 'active'
-    }).select('roomId');
-
-    const roomIds = userChats.map(chat => chat.roomId);
-
-    // Count unread messages across all rooms
-    const unreadCount = await Message.countDocuments({
-      roomId: { $in: roomIds },
-      'sender.participantId': { $ne: userId },
-      'readBy.participantId': { $ne: userId }
-    });
-
-    return successResponse(res, 'Unread count retrieved successfully', {
-      unreadCount
-    });
-
-  } catch (error) {
-    console.error('Error getting unread count:', error);
-    return errorResponse(res, 'Failed to get unread count', 500);
-  }
-};
-
-// Add admin to existing chat (for monitoring)
-export const addAdminToChat = async (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const { adminId } = req.body;
-
-    // Verify requester is admin
-    if (req.user.role !== 'admin') {
-      return errorResponse(res, 'Only admins can perform this action', 403);
-    }
-
-    const chat = await Chat.findOne({ roomId });
-    if (!chat) {
-      return errorResponse(res, 'Chat room not found', 404);
-    }
-
-    // Check if admin is already a participant
-    const existingParticipant = chat.participants.find(p => 
-      p.participantId.toString() === adminId.toString()
-    );
-
-    if (existingParticipant) {
-      return errorResponse(res, 'Admin is already a participant', 400);
-    }
-
-    // Add admin to participants
-    chat.participants.push({
-      participantId: adminId,
-      participantType: 'User',
-      role: 'admin'
-    });
-
-    await chat.save();
-
-    return successResponse(res, 'Admin added to chat successfully', chat);
-
-  } catch (error) {
-    console.error('Error adding admin to chat:', error);
-    return errorResponse(res, 'Failed to add admin to chat', 500);
-  }
-};
-
-// 🔐 **ADVANCED FEATURES** 🔐
 
 // Message encryption/decryption utilities
 const encryptMessage = (text, key = process.env.CHAT_ENCRYPTION_KEY || 'default-secret-key') => {
