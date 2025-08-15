@@ -30,7 +30,7 @@ const messageSchema = new mongoose.Schema({
     type: String,
     enum: [
       'text', 'media', 'voice', 'offer', 'acceptance', 'decline', 'negotiation', 
-      'system', 'location', 'contact', 'forwarded', 'poll', 'sticker', 'gif'
+      'system', 'location', 'contact', 'forwarded', 'poll', 'sticker', 'gif', 'campaign_offer'
     ],
     default: 'text'
   },

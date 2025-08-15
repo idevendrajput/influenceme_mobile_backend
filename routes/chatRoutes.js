@@ -3,21 +3,7 @@ import {
   createOrGetChatRoom,
   getUserChatRooms,
   getChatMessages,
-  sendMessage,
-  markMessagesAsRead,
-  getUnreadMessageCount,
-  addAdminToChat,
-  // 🚀 Advanced Features
-  sendMediaMessage,
-  sendVoiceMessage,
-  sendEncryptedMessage,
-  addReactionToMessage,
-  editMessage,
-  deleteMessage,
-  searchMessages,
-  forwardMessage,
-  getChatStatistics,
-  exportChatData
+  sendMessage
 } from '../controllers/chatController.js';
 import { authenticate } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
